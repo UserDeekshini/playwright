@@ -1,0 +1,42 @@
+# Pipeline Stages
+stages:
+  - test
+
+default:
+  tags:
+    - docker
+
+include:
+  - template: Security/SAST.gitlab-ci.yml
+  - template: Security/Dependency-Scanning.gitlab-ci.yml
+  - template: Security/Secret-Detection.gitlab-ci.yml
+
+# Template for Playwright test jobs
+.test_template: &test_command
+  stage: test
+  image: mcr.microsoft.com/playwright:v1.42.1-jammy
+  script:
+    - npm ci
+    - echo "TEST_TYPE=$TEST_TYPE"
+    - echo "PROJECT=$PROJECT"
+    - >
+      if [ "$TEST_TYPE" = "annotation" ]; then
+        npx playwright test --grep="@${TAG}" --project=$PROJECT
+      elif [ "$TEST_TYPE" = "file" ]; then
+        npx playwright test ${FILENAME} --project=$PROJECT
+      fi
+  allow_failure: true
+  artifacts:
+    when: always
+    paths:
+      - playwright-report
+    expire_in: 2 days
+
+# Jobs that use the template
+
+PrismHappyPath2_Job:
+  <<: *test_command
+  variables:
+    TEST_TYPE: 'file'
+    FILENAME: 'PrismHappyPath2.test.ts'
+    PROJECT: 'chromium'
